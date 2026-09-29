@@ -58,64 +58,6 @@ if TYPE_CHECKING:
 eval_logger = logging.getLogger(__name__)
 
 
-def _should_tie_weights(model: torch.nn.Module) -> bool:
-    """Re-tie only when that cannot replace a real, separate LM head.
-
-    ``from_pretrained`` already ties weights when the config asks for it, and
-    it refuses to tie when the checkpoint stores both matrices with different
-    values. ``HFLM`` then called ``tie_weights()`` again with no checkpoint
-    context. That second call trusts ``tie_word_embeddings`` (true by default
-    on many architectures) and overwrites a distinct ``lm_head`` with
-    ``embed_tokens``, so an untied model emits garbage.
-    """
-    config = getattr(model, "config", None)
-    if config is not None and not getattr(config, "tie_word_embeddings", True):
-        return False
-
-    get_in = getattr(model, "get_input_embeddings", None)
-    get_out = getattr(model, "get_output_embeddings", None)
-    if not callable(get_in) or not callable(get_out):
-        return True
-    try:
-        in_emb = get_in()
-        out_emb = get_out()
-    except Exception:
-        return True
-    if (
-        in_emb is None
-        or out_emb is None
-        or not hasattr(in_emb, "weight")
-        or not hasattr(out_emb, "weight")
-    ):
-        return False
-
-    in_w = in_emb.weight
-    out_w = out_emb.weight
-    if in_w.data_ptr() == out_w.data_ptr():
-        return True
-    if tuple(in_w.shape) != tuple(out_w.shape):
-        eval_logger.warning(
-            "Skipping tie_weights(): input and output embeddings differ in shape, "
-            "so this checkpoint is untied."
-        )
-        return False
-    try:
-        same = bool(torch.equal(in_w, out_w))
-    except Exception:
-        eval_logger.warning(
-            "Skipping tie_weights(): could not compare a separately stored LM head "
-            "with the input embeddings."
-        )
-        return False
-    if not same:
-        eval_logger.warning(
-            "Skipping tie_weights(): config requests tied embeddings, but the "
-            "checkpoint has a distinct lm_head. Tying it would overwrite that "
-            "head with the input embeddings."
-        )
-    return same
-
-
 @register_model("hf-auto", "hf", "huggingface")
 class HFLM(TemplateLM):
     """An abstracted Huggingface model class. Enables usage with both models of
@@ -447,7 +389,9 @@ class HFLM(TemplateLM):
         # access self._model through self.model property outside this method
         if isinstance(self.model, torch.nn.Module):
             self.model.eval()
-            if _should_tie_weights(self.model):
+            # Untied models keep a separate lm_head. Calling tie_weights()
+            # overwrites it with the input embeddings and the text is garbage.
+            if getattr(self.model.config, "tie_word_embeddings", True):
                 self.model.tie_weights()
 
         self.think_end_token = (
