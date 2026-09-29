@@ -91,12 +91,24 @@ class Validate(SubCommand):
             metavar="DIR",
             help="Additional path to include if there are external tasks.",
         )
+        self._parser.add_argument(
+            "--no-include-defaults",
+            action="store_true",
+            default=False,
+            help=(
+                "Do not index built-in tasks under lm_eval/tasks/. "
+                "Use with --include_path."
+            ),
+        )
 
     def _execute(self, args: argparse.Namespace) -> None:
         """Execute the validate command."""
         from lm_eval.tasks import TaskManager
 
-        task_manager = TaskManager(include_path=args.include_path)
+        task_manager = TaskManager(
+            include_path=args.include_path,
+            include_defaults=not args.no_include_defaults,
+        )
         task_list = args.tasks.split(",")
 
         print(f"Validating tasks: {task_list}")

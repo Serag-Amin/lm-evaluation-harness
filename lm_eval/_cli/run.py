@@ -242,6 +242,17 @@ class Run(SubCommand):
             help="Additional directory for external tasks",
         )
         task_group.add_argument(
+            "--no-include-defaults",
+            action="store_true",
+            default=False,
+            help=(
+                "Do not index every built-in task under lm_eval/tasks/. "
+                "That scan parses thousands of YAML files and can take many "
+                "minutes before evaluation starts. Use with --include_path "
+                "pointing at the task directory you actually want."
+            ),
+        )
+        task_group.add_argument(
             "--plugins",
             default=None,
             nargs="+",
@@ -410,6 +421,10 @@ class Run(SubCommand):
         # Log task selection (tasks already processed in config)
         if cfg.include_path is not None:
             eval_logger.info("Including path: %s", cfg.include_path)
+        if cfg.no_include_defaults:
+            eval_logger.info(
+                "Skipping the built-in task index (--no-include-defaults)"
+            )
         eval_logger.info("Selected Tasks: %s", cfg.tasks)
 
         # Run evaluation

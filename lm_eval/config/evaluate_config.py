@@ -154,6 +154,13 @@ class EvaluatorConfig:
     include_path: str | None = field(
         default=None, metadata={"help": "Additional dir path for external tasks"}
     )
+    no_include_defaults: bool = field(
+        default=False,
+        metadata={
+            "help": "Skip the built-in lm_eval/tasks index. Pass --include_path "
+            "for the directory that contains the tasks you want."
+        },
+    )
     plugins: list[str] | None = field(
         default=None,
         metadata={
@@ -417,6 +424,7 @@ class EvaluatorConfig:
         # Create task manager with metadata
         task_manager = TaskManager(
             include_path=self.include_path,
+            include_defaults=not self.no_include_defaults,
             metadata=self.metadata or {},
         )
 
