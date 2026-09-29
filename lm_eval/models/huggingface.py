@@ -389,9 +389,17 @@ class HFLM(TemplateLM):
         # access self._model through self.model property outside this method
         if isinstance(self.model, torch.nn.Module):
             self.model.eval()
-            # Untied models keep a separate lm_head. Calling tie_weights()
-            # overwrites it with the input embeddings and the text is garbage.
-            if getattr(self.model.config, "tie_word_embeddings", True):
+            # A distinct lm_head is intentional. tie_weights() would overwrite
+            # it with the input embeddings and the text comes out as one token
+            # repeated. Only retie when the two matrices are already the same.
+            try:
+                input_emb = self.model.get_input_embeddings().weight
+                output_emb = self.model.get_output_embeddings().weight
+                already_untied_intentionally = not torch.equal(input_emb, output_emb)
+            except Exception:
+                already_untied_intentionally = False
+
+            if not already_untied_intentionally:
                 self.model.tie_weights()
 
         self.think_end_token = (
