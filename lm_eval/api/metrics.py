@@ -100,21 +100,20 @@ def bleu(items):
 
 @register_aggregation("chrf")
 def chrf(items):
-    """chrF is an evaluation metric for machine translation output based on
-    character n-gram precision and recall.
+    """chrF++. FLORES tasks call this aggregation ``chrf``.
 
-    Computed with sacrebleu's defaults: char_order=6, word_order=0, beta=2.
-    For chrF++ (word_order=2), use the ``chrf++`` metric instead.
+    word_order=2, char_order=6, beta=2. This is the call the Egyptian run used.
+    Plain chrF is the same call with word_order=0.
 
     Source: https://github.com/m-popovic/chrF
-    Paper: https://www.aclweb.org/anthology/W15-3049.pdf
+    Paper: https://aclanthology.org/W17-4770.pdf
 
     Higher is better
     """
     refs = list(zip(*items))[0]
     preds = list(zip(*items))[1]
     refs, preds = _sacreformat(refs, preds)
-    return sacrebleu.corpus_chrf(preds, refs).score
+    return sacrebleu.corpus_chrf(preds, refs, word_order=2).score
 
 
 @register_aggregation("chrf++")
